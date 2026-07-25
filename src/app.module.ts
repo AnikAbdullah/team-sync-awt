@@ -6,6 +6,7 @@ import * as Joi from 'joi';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
@@ -41,6 +42,7 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
         logging: config.get<string>('NODE_ENV') === 'development',
       }),
     }),
+    UsersModule,
     AuthModule,
   ],
   controllers: [AppController],
