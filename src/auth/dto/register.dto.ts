@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
+  IsNotEmpty,
   IsString,
   Length,
   Matches,
@@ -9,11 +10,13 @@ import {
 } from 'class-validator';
 
 export class RegisterDto {
+  @IsNotEmpty()
   @IsEmail()
   @MaxLength(254)
   @Transform(({ value }) => value?.trim().toLowerCase())
   email: string;
 
+  @IsNotEmpty()
   @IsString()
   @MinLength(8)
   @MaxLength(72)
@@ -23,6 +26,7 @@ export class RegisterDto {
   })
   password: string;
 
+  @IsNotEmpty()
   @IsString()
   @Length(2, 80)
   @Transform(({ value }) => value?.trim())
