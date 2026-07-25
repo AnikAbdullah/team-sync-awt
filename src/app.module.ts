@@ -28,6 +28,7 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
         JWT_SECRET: Joi.string().min(32).required(),
         JWT_EXPIRES_IN: Joi.string().default('1d'),
         CORS_ORIGIN: Joi.string().default('http://localhost:3001'),
+        APP_URL: Joi.string().default('http://localhost:3000/api/v1'),
         MAIL_HOST: Joi.string().default('smtp.gmail.com'),
         MAIL_PORT: Joi.number().default(587),
         MAIL_SECURE: Joi.string().valid('true', 'false').default('false'),
