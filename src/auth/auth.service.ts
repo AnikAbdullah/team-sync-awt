@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import * as argon2 from 'argon2';
 import { User } from '../users/entities/user.entity';
 import { UserStatus } from '../common/enums/domain.enums';
+import { MailService } from '../mail/mail.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -19,6 +20,7 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -34,6 +36,13 @@ export class AuthService {
     });
 
     const saved = await this.userRepository.save(user);
+
+    void this.mailService.sendMail(
+      saved.email,
+      'Welcome to TeamSync',
+      this.welcomeEmailHtml(dto.fullName),
+    );
+
     return this.toSafeUser(saved);
   }
 
@@ -69,6 +78,14 @@ export class AuthService {
     });
 
     return { accessToken, user: this.toSafeUser(user) };
+  }
+
+  private welcomeEmailHtml(fullName: string): string {
+    return `
+      <h2>Welcome to TeamSync, ${fullName}!</h2>
+      <p>Your account has been created successfully.</p>
+      <p>You can now sign in and start collaborating with your team.</p>
+    `;
   }
 
   private toSafeUser(user: User) {
