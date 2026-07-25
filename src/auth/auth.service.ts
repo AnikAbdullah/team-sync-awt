@@ -33,13 +33,9 @@ export class AuthService {
     });
     if (existing) throw new ConflictException('Email is already registered');
 
-    const token = this.createVerificationToken();
-
     const user = this.userRepository.create({
       email: dto.email,
       passwordHash: await argon2.hash(dto.password),
-      emailVerificationTokenHash: token.hash,
-      emailVerificationExpiresAt: token.expiresAt,
       profile: { fullName: dto.fullName },
     });
 
@@ -47,8 +43,8 @@ export class AuthService {
 
     void this.mailService.sendMail(
       saved.email,
-      'Welcome to TeamSync — please verify your email',
-      this.welcomeEmailHtml(dto.fullName, this.verificationUrl(token.raw)),
+      'Welcome to TeamSync',
+      this.welcomeEmailHtml(dto.fullName),
     );
 
     return this.toSafeUser(saved);
@@ -145,13 +141,12 @@ export class AuthService {
     return `${base}/auth/verify-email?token=${rawToken}`;
   }
 
-  private welcomeEmailHtml(fullName: string, verifyUrl: string): string {
+  private welcomeEmailHtml(fullName: string): string {
     return `
       <h2>Welcome to TeamSync, ${fullName}!</h2>
-      <p>Your account has been created successfully.</p>
-      <p>Please verify your email address to activate all features:</p>
-      <p><a href="${verifyUrl}">Verify my email</a></p>
-      <p>This link expires in 24 hours.</p>
+      <p>Your account has been created successfully and is ready to use.</p>
+      <p>Sign in to create a workspace, invite your team, and start managing projects and tasks together.</p>
+      <p>Happy collaborating,<br/>The TeamSync Team</p>
     `;
   }
 
