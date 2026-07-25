@@ -1,13 +1,9 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty } from 'class-validator';
 
-export class LoginDto {
+export class ResendVerificationDto {
   @IsNotEmpty()
   @IsEmail()
   @Transform(({ value }) => value?.trim().toLowerCase())
   email: string;
-
-  @IsNotEmpty()
-  @IsString()
-  password: string;
 }

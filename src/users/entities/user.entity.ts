@@ -31,6 +31,15 @@ export class User {
   })
   status: UserStatus;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  emailVerifiedAt?: Date | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true, select: false })
+  emailVerificationTokenHash?: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  emailVerificationExpiresAt?: Date | null;
+
   @OneToOne(() => UserProfile, (profile) => profile.user, { cascade: true })
   profile: UserProfile;
 
