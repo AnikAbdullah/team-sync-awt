@@ -248,7 +248,7 @@ export class AuthService {
 
   private async issueRefreshToken(userId: string): Promise<string> {
     const refreshToken = await this.jwtService.signAsync(
-      { sub: userId, type: 'refresh' },
+      { sub: userId, type: 'refresh', jti: randomBytes(16).toString('hex') },
       {
         secret: this.refreshSecret,
         expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN') ?? '7d',
