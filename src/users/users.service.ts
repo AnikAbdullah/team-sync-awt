@@ -34,6 +34,14 @@ export class UsersService {
     return this.toProfile(user);
   }
 
+  async updateAvatar(userId: string, file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No image file uploaded');
+    const user = await this.findWithProfile(userId);
+    user.profile.avatarUrl = `/uploads/avatars/${file.filename}`;
+    await this.profileRepository.save(user.profile);
+    return this.toProfile(user);
+  }
+
   async changePassword(userId: string, dto: ChangePasswordDto) {
     const user = await this.userRepository.findOne({
       where: { id: userId },

@@ -1,7 +1,7 @@
 import { IsNotEmpty, IsString } from 'class-validator';
 
-export class VerifyEmailDto {
+export class RefreshTokenDto {
   @IsNotEmpty()
   @IsString()
-  token: string;
+  refreshToken: string;
 }

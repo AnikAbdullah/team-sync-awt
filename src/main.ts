@@ -1,12 +1,14 @@
 import helmet from 'helmet';
+import { join } from 'path';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
 
   app.use(helmet({ contentSecurityPolicy: false }));
@@ -27,6 +29,8 @@ async function bootstrap() {
     origin: config.get<string>('CORS_ORIGIN') ?? '*',
     credentials: true,
   });
+
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('TeamSync API')
