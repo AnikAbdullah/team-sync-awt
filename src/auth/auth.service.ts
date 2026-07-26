@@ -80,8 +80,66 @@ export class AuthService {
       email: user.email,
       type: 'access',
     });
+    const refreshToken = await this.issueRefreshToken(user.id);
 
-    return { accessToken, user: this.toSafeUser(user) };
+    return { accessToken, refreshToken, user: this.toSafeUser(user) };
+  }
+
+  async refreshTokens(refreshToken: string) {
+    const invalid = new UnauthorizedException(
+      'Invalid or expired refresh token',
+    );
+    let payload: { sub: string; type: string };
+    try {
+      payload = await this.jwtService.verifyAsync<{ sub: string; type: string }>(
+        refreshToken,
+        { secret: this.refreshSecret },
+      );
+    } catch {
+      throw invalid;
+    }
+    if (payload.type !== 'refresh') throw invalid;
+
+    const user = await this.userRepository.findOne({
+      where: { id: payload.sub },
+      relations: { profile: true },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        createdAt: true,
+        refreshTokenHash: true,
+        profile: { id: true, fullName: true, avatarUrl: true },
+      },
+    });
+
+    if (!user || !user.refreshTokenHash) throw invalid;
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException('Your account is not active');
+    }
+
+    const providedHash = createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
+    if (providedHash !== user.refreshTokenHash) throw invalid;
+
+    const accessToken = await this.jwtService.signAsync({
+      sub: user.id,
+      email: user.email,
+      type: 'access',
+    });
+    const newRefreshToken = await this.issueRefreshToken(user.id);
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      user: this.toSafeUser(user),
+    };
+  }
+
+  async logout(userId: string) {
+    await this.userRepository.update(userId, { refreshTokenHash: null });
+    return { message: 'Logged out successfully' };
   }
 
   async verifyEmail(token: string) {
@@ -139,6 +197,26 @@ export class AuthService {
     const base =
       this.config.get<string>('APP_URL') || 'http://localhost:3000/api/v1';
     return `${base}/auth/verify-email?token=${rawToken}`;
+  }
+
+  private async issueRefreshToken(userId: string): Promise<string> {
+    const refreshToken = await this.jwtService.signAsync(
+      { sub: userId, type: 'refresh' },
+      {
+        secret: this.refreshSecret,
+        expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN') ?? '7d',
+      },
+    );
+    const hash = createHash('sha256').update(refreshToken).digest('hex');
+    await this.userRepository.update(userId, { refreshTokenHash: hash });
+    return refreshToken;
+  }
+
+  private get refreshSecret(): string {
+    return (
+      this.config.get<string>('JWT_REFRESH_SECRET') ||
+      `${this.config.getOrThrow<string>('JWT_SECRET')}-refresh`
+    );
   }
 
   private welcomeEmailHtml(fullName: string): string {

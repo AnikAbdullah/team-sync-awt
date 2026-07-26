@@ -40,6 +40,9 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   emailVerificationExpiresAt?: Date | null;
 
+  @Column({ type: 'varchar', length: 64, nullable: true, select: false })
+  refreshTokenHash?: string | null;
+
   @OneToOne(() => UserProfile, (profile) => profile.user, { cascade: true })
   profile: UserProfile;
 
