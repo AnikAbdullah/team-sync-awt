@@ -11,7 +11,13 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { diskStorage } from 'multer';
 import { mkdirSync } from 'fs';
 import { extname } from 'path';
@@ -30,16 +36,26 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get('me')
+  @ApiOperation({ summary: 'Get my profile' })
   getMe(@CurrentUser() user: AuthUser) {
     return this.usersService.getProfile(user.id);
   }
 
   @Patch('me')
+  @ApiOperation({ summary: 'Update my profile' })
   updateMe(@CurrentUser() user: AuthUser, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(user.id, dto);
   }
 
   @Patch('me/avatar')
+  @ApiOperation({ summary: 'Upload a profile image (jpg, png, gif, webp)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -76,6 +92,7 @@ export class UsersController {
 
   @Patch('me/password')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change my password' })
   changePassword(
     @CurrentUser() user: AuthUser,
     @Body() dto: ChangePasswordDto,
@@ -84,6 +101,7 @@ export class UsersController {
   }
 
   @Get('search')
+  @ApiOperation({ summary: 'Search users by email or name (paginated)' })
   search(@Query() query: UserSearchQueryDto) {
     return this.usersService.search(query);
   }

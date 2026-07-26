@@ -6,7 +6,7 @@ import {
   HttpStatus,
   Post,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -26,6 +26,7 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
+  @ApiOperation({ summary: 'Register a new user and send a welcome email' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -34,6 +35,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Log in and receive access + refresh tokens' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
@@ -42,6 +44,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a password reset link by email' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email);
   }
@@ -50,6 +53,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset the password using an emailed token' })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword);
   }
@@ -58,6 +62,7 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Exchange a refresh token for new tokens (rotates)' })
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refreshTokens(dto.refreshToken);
   }
@@ -65,12 +70,14 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Log out and revoke the refresh token' })
   logout(@CurrentUser() user: AuthUser) {
     return this.authService.logout(user.id);
   }
 
   @Get('me')
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get the current authenticated user' })
   me(@CurrentUser() user: AuthUser) {
     return {
       id: user.id,
