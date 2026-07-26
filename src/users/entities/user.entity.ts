@@ -49,6 +49,12 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   passwordResetExpiresAt?: Date | null;
 
+  @Column({ type: 'int', default: 0 })
+  failedLoginAttempts: number;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  lockedUntil?: Date | null;
+
   @OneToOne(() => UserProfile, (profile) => profile.user, { cascade: true })
   profile: UserProfile;
 

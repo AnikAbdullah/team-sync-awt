@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -17,8 +18,13 @@ import { MailService } from '../mail/mail.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_MINUTES = 15;
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -40,6 +46,7 @@ export class AuthService {
     });
 
     const saved = await this.userRepository.save(user);
+    this.logger.log(`New user registered: ${saved.email}`);
 
     void this.mailService.sendMail(
       saved.email,
@@ -60,6 +67,8 @@ export class AuthService {
         status: true,
         passwordHash: true,
         createdAt: true,
+        failedLoginAttempts: true,
+        lockedUntil: true,
         profile: {
           id: true,
           fullName: true,
@@ -69,11 +78,32 @@ export class AuthService {
     });
 
     const invalid = new UnauthorizedException('Invalid email or password');
-    if (!user) throw invalid;
-    if (!(await argon2.verify(user.passwordHash, dto.password))) throw invalid;
+    if (!user) {
+      this.logger.warn(`Failed login for unknown email: ${dto.email}`);
+      throw invalid;
+    }
+
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      this.logger.warn(`Login blocked for locked account: ${user.email}`);
+      throw new ForbiddenException(
+        'Account temporarily locked due to too many failed attempts. Please try again later.',
+      );
+    }
+
+    const passwordValid = await argon2.verify(user.passwordHash, dto.password);
+    if (!passwordValid) {
+      await this.registerFailedLogin(user);
+      throw invalid;
+    }
+
     if (user.status !== UserStatus.ACTIVE) {
       throw new ForbiddenException('Your account is not active');
     }
+
+    await this.userRepository.update(user.id, {
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+    });
 
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
@@ -81,6 +111,7 @@ export class AuthService {
       type: 'access',
     });
     const refreshToken = await this.issueRefreshToken(user.id);
+    this.logger.log(`User logged in: ${user.email}`);
 
     return { accessToken, refreshToken, user: this.toSafeUser(user) };
   }
@@ -129,6 +160,7 @@ export class AuthService {
       type: 'access',
     });
     const newRefreshToken = await this.issueRefreshToken(user.id);
+    this.logger.log(`Tokens refreshed: ${user.email}`);
 
     return {
       accessToken,
@@ -139,6 +171,7 @@ export class AuthService {
 
   async logout(userId: string) {
     await this.userRepository.update(userId, { refreshTokenHash: null });
+    this.logger.log(`User logged out: ${userId}`);
     return { message: 'Logged out successfully' };
   }
 
@@ -151,6 +184,7 @@ export class AuthService {
         passwordResetTokenHash: token.hash,
         passwordResetExpiresAt: token.expiresAt,
       });
+      this.logger.log(`Password reset requested: ${user.email}`);
 
       void this.mailService.sendMail(
         user.email,
@@ -184,7 +218,10 @@ export class AuthService {
       passwordResetTokenHash: null,
       passwordResetExpiresAt: null,
       refreshTokenHash: null,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
     });
+    this.logger.log(`Password reset completed: ${user.email}`);
 
     return { message: 'Password has been reset successfully' };
   }
@@ -207,6 +244,7 @@ export class AuthService {
     user.emailVerificationTokenHash = null;
     user.emailVerificationExpiresAt = null;
     await this.userRepository.save(user);
+    this.logger.log(`Email verified: ${user.email}`);
 
     return { message: 'Email verified successfully' };
   }
@@ -231,6 +269,26 @@ export class AuthService {
       message:
         'If an unverified account exists for that email, a verification link has been sent',
     };
+  }
+
+  private async registerFailedLogin(user: User) {
+    const attempts = (user.failedLoginAttempts ?? 0) + 1;
+    if (attempts >= MAX_LOGIN_ATTEMPTS) {
+      await this.userRepository.update(user.id, {
+        failedLoginAttempts: 0,
+        lockedUntil: new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000),
+      });
+      this.logger.warn(
+        `Account locked after ${attempts} failed attempts: ${user.email}`,
+      );
+    } else {
+      await this.userRepository.update(user.id, {
+        failedLoginAttempts: attempts,
+      });
+      this.logger.warn(
+        `Failed login (${attempts}/${MAX_LOGIN_ATTEMPTS}): ${user.email}`,
+      );
+    }
   }
 
   private createVerificationToken() {
