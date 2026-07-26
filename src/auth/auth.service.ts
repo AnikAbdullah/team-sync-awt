@@ -142,6 +142,53 @@ export class AuthService {
     return { message: 'Logged out successfully' };
   }
 
+  async forgotPassword(email: string) {
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    if (user) {
+      const token = this.createResetToken();
+      await this.userRepository.update(user.id, {
+        passwordResetTokenHash: token.hash,
+        passwordResetExpiresAt: token.expiresAt,
+      });
+
+      void this.mailService.sendMail(
+        user.email,
+        'Reset your TeamSync password',
+        this.passwordResetEmailHtml(this.resetUrl(token.raw)),
+      );
+    }
+
+    return {
+      message:
+        'If an account exists for that email, a password reset link has been sent',
+    };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const hash = createHash('sha256').update(token).digest('hex');
+    const user = await this.userRepository.findOne({
+      where: { passwordResetTokenHash: hash },
+    });
+
+    if (
+      !user ||
+      !user.passwordResetExpiresAt ||
+      user.passwordResetExpiresAt.getTime() < Date.now()
+    ) {
+      throw new BadRequestException('Invalid or expired password reset token');
+    }
+
+    await this.userRepository.update(user.id, {
+      passwordHash: await argon2.hash(newPassword),
+      passwordResetTokenHash: null,
+      passwordResetExpiresAt: null,
+      refreshTokenHash: null,
+    });
+
+    return { message: 'Password has been reset successfully' };
+  }
+
   async verifyEmail(token: string) {
     const hash = createHash('sha256').update(token).digest('hex');
     const user = await this.userRepository.findOne({
@@ -217,6 +264,28 @@ export class AuthService {
       this.config.get<string>('JWT_REFRESH_SECRET') ||
       `${this.config.getOrThrow<string>('JWT_SECRET')}-refresh`
     );
+  }
+
+  private createResetToken() {
+    const raw = randomBytes(32).toString('hex');
+    const hash = createHash('sha256').update(raw).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    return { raw, hash, expiresAt };
+  }
+
+  private resetUrl(rawToken: string): string {
+    const base =
+      this.config.get<string>('APP_URL') || 'http://localhost:3000/api/v1';
+    return `${base}/auth/reset-password?token=${rawToken}`;
+  }
+
+  private passwordResetEmailHtml(resetUrl: string): string {
+    return `
+      <h2>Reset your password</h2>
+      <p>We received a request to reset your TeamSync password.</p>
+      <p><a href="${resetUrl}">Reset my password</a></p>
+      <p>This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
+    `;
   }
 
   private welcomeEmailHtml(fullName: string): string {

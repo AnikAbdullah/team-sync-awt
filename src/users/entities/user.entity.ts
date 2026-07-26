@@ -43,6 +43,12 @@ export class User {
   @Column({ type: 'varchar', length: 64, nullable: true, select: false })
   refreshTokenHash?: string | null;
 
+  @Column({ type: 'varchar', length: 64, nullable: true, select: false })
+  passwordResetTokenHash?: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordResetExpiresAt?: Date | null;
+
   @OneToOne(() => UserProfile, (profile) => profile.user, { cascade: true })
   profile: UserProfile;
 
